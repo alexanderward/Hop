@@ -1,0 +1,212 @@
+service: hop
+app: hop
+tenant: alexanderward1
+  
+plugins:
+  - serverless-iam-roles-per-function
+  - serverless-plugin-split-stacks
+  - serverless-python-requirements
+package:
+    exclude:
+    - README.md 
+
+custom:
+    pythonRequirements:
+        # zip: true
+        slim: true
+        pipCmdExtraArgs:
+            - --no-cache-dir        
+    splitStacks:
+        perFunction: false
+        perType: true
+    stack: ${opt:stack, 'dev'}
+    deploy: ${opt:deploy, '${self:custom.stack}'}  
+   
+  
+provider:
+    name: aws
+    runtime: python3.6
+    stackTags:
+        STACK: ${self:custom.stack}
+        DEPLOY: ${self:custom.deploy, 'dev'}
+        
+    environment:
+        region: ${env:region, 'us-east-1'}
+        cors: '*'
+        stack: ${self:custom.stack}
+
+functions:
+    stack_get_state:
+      handler: lambdas/api/stack/get_state.lambda_handler
+      events:
+            - http:
+                path: /stack/get-state
+                method: get
+                cors: ${file(./cors.yml)}
+      iamRoleStatementsInherit: true
+      iamRoleStatements:
+        - Effect: "Allow"
+          Action:
+            - "ec2:DescribeInstances"
+            - "rds:DescribeDBInstances"
+            - "rds:ListTagsForResource"
+          Resource:
+            - "*"
+
+    start_services:
+      handler: lambdas/api/stack/start.lambda_handler
+      events:
+            - http:
+                path: /stack/start
+                method: post
+                cors: ${file(./cors.yml)}
+      iamRoleStatementsInherit: true
+      iamRoleStatements:
+        - Effect: "Allow"
+          Action:
+            - "ec2:*"
+            - "rds:*"
+          Resource:
+            - "*"
+
+    stop_services:
+      handler: lambdas/api/stack/stop.lambda_handler
+      events:
+            - http:
+                path: /stack/stop
+                method: post
+                cors: ${file(./cors.yml)}
+      iamRoleStatementsInherit: true
+      iamRoleStatements:
+        - Effect: "Allow"
+          Action:
+            - "ec2:*"
+            - "rds:*"
+          Resource:
+            - "*"
+
+    check_places:
+      handler: lambdas/api/places/check.lambda_handler
+      events:
+            - http:
+                path: /places/check
+                method: post
+                cors: ${file(./cors.yml)}
+      iamRoleStatementsInherit: true
+      iamRoleStatements:
+        - Effect: "Allow"
+          Action:
+            - "sqs:SendMessage"
+          Resource:
+            - "*"
+      environment:
+        SQS_URL:
+          Ref: FindPlacesQueue
+
+    find_places_sqs:
+      handler: lambdas/processing/places/find_places.lambda_handler
+      reservedConcurrency: 10
+      iamRoleStatementsInherit: true
+      iamRoleStatements:
+        - Effect: "Allow"
+          Action:
+            - "sqs:ReceiveMessage"
+            - "sqs:DeleteMessage"
+            - "sqs:GetQueueAttributes"
+          Resource:
+            Fn::GetAtt: [ FindPlacesQueue, Arn ]
+        - Effect: "Allow"
+          Action:
+            - "sqs:SendMessage"
+          Resource:
+            Fn::GetAtt: [ FindPlaceDetailsQueue, Arn ]
+      events:
+        - sqs:
+            arn:
+              Fn::GetAtt:
+                - FindPlacesQueue
+                - Arn
+      environment:
+        FindPlaceDetailsQueue_URL:
+          Ref: FindPlaceDetailsQueue
+        FindPlacesQueue_URL:
+          Ref: FindPlacesQueue
+
+    find_place_details_sqs:
+      handler: lambdas/processing/places/find_place_details.lambda_handler
+      reservedConcurrency: 10
+      iamRoleStatementsInherit: true
+      iamRoleStatements:
+        - Effect: "Allow"
+          Action:
+            - "sqs:ReceiveMessage"
+            - "sqs:DeleteMessage"
+            - "sqs:GetQueueAttributes"
+          Resource:
+            Fn::GetAtt: [ FindPlaceDetailsQueue, Arn ]
+        - Effect: "Allow"
+          Action:
+            - "sqs:SendMessage"
+          Resource:
+            Fn::GetAtt: [ InsertPlaceDetailsQueue, Arn ]
+      events:
+        - sqs:
+            arn:
+              Fn::GetAtt:
+                - FindPlaceDetailsQueue
+                - Arn
+      environment:
+        FindPlaceDetailsQueue_URL:
+          Ref: FindPlaceDetailsQueue
+        InsertPlaceDetailsQueue_URL:
+          Ref: InsertPlaceDetailsQueue
+            
+resources:
+  Resources:
+    GatewayResponseDefault4XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
+    FindPlacesQueue:
+      Type: "AWS::SQS::Queue"
+      Properties:
+        QueueName: "FindPlacesQueue-${self:custom.stack}"
+        VisibilityTimeout: 20
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+              - ErrorQueue
+              - Arn
+          maxReceiveCount: 1
+    FindPlaceDetailsQueue:
+      Type: "AWS::SQS::Queue"
+      Properties:
+        QueueName: "FindPlaceDetailsQueue-${self:custom.stack}"
+        VisibilityTimeout: 20
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+              - ErrorQueue
+              - Arn
+          maxReceiveCount: 1
+    InsertPlaceDetailsQueue:
+      Type: "AWS::SQS::Queue"
+      Properties:
+        QueueName: "InsertPlaceDetailsQueue-${self:custom.stack}"
+        VisibilityTimeout: 20
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+              - ErrorQueue
+              - Arn
+          maxReceiveCount: 1
+    ErrorQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: "ErrorQueue-${self:custom.stack}"
+        MessageRetentionPeriod: 1209600

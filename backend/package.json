@@ -1,0 +1,12 @@
+{
+  "name": "hop",
+  "description": "",
+  "version": "0.1.0",
+  "dependencies": {},
+  "devDependencies": {
+    "serverless": "^1.32.0",
+    "serverless-iam-roles-per-function": "^1.0.4",
+    "serverless-plugin-split-stacks": "^1.7.0",
+    "serverless-python-requirements": "^4.2.5"
+  }
+}

@@ -1,0 +1,6 @@
+SQLAlchemy==1.2.6
+sqlalchemy-mixins==0.2.3
+PySocks==1.6.8
+pytz==2018.3
+requests==2.18.4
+geopy==1.11.0

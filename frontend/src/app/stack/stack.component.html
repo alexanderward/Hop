@@ -1,0 +1,44 @@
+<h4 class="font-weight-bold py-3 mb-4">
+    <span class="text-muted font-weight-light">Stack /</span> List
+</h4>
+<hr class="border-light container-m--x mt-0 mb-4">
+<div class="demo-inline-spacing mt-3">
+    <button class="btn btn-primary" type="button" (click)="$refresh.next(null)">Refresh</button>
+    <button *ngIf="selected.length" class="btn btn-success" (click)="$start.next(selected)" type="button">Start</button>
+    <button *ngIf="selected.length" class="btn btn-danger" (click)="$stop.next(selected)" type="button">Stop</button>
+</div>
+<div class="demo-vertical-spacing">
+    <div>
+        <div class="table-responsive">
+            <div class="table-responsive">
+                <ngx-datatable #table style="min-width: 500px" [rows]="rows" [loadingIndicator]="loadingIndicator"
+                    [columnMode]="'force'" [headerHeight]="43" [footerHeight]="'auto'" [rowHeight]="'auto'"
+                    [reorderable]="true" [selected]="selected" [selectionType]="'checkbox'" [limit]="10" (select)='onSelect($event)'>
+                    <ngx-datatable-column [width]="40" [sortable]="false" [canAutoResize]="false" [draggable]="false"
+                        [resizeable]="false" [headerCheckboxable]="true" [checkboxable]="true">
+                    </ngx-datatable-column>
+                    <ngx-datatable-column>
+                        <ng-template let-column="column" ngx-datatable-header-template>
+                            <span>ID</span>
+                        </ng-template>
+                        <ng-template let-row="row" ngx-datatable-cell-template>
+                            {{row.id}}
+                        </ng-template>
+                    </ngx-datatable-column>
+                    <ngx-datatable-column name="Status">
+                        <ng-template let-row="row" ngx-datatable-cell-template>
+                            {{row.status | titlecase }}
+                        </ng-template>
+                    </ngx-datatable-column>
+                    <ngx-datatable-column name="Service">
+                        <ng-template let-row="row" ngx-datatable-cell-template>
+                            {{row.service | uppercase }}
+                        </ng-template>
+                    </ngx-datatable-column>
+
+                    <ngx-datatable-column name="Tags"></ngx-datatable-column>
+                </ngx-datatable>
+            </div>
+        </div>
+    </div>
+</div>
